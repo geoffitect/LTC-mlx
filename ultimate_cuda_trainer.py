@@ -20,9 +20,9 @@ from tqdm import tqdm
 import os
 import random
 
-# Import our components
-from spline.sequence_to_3di import SPLINE_CONFIG, AA_TO_IDX
-from enhanced_real_trainer_fixed import REAL_FOLDSEEK_3DI_ALPHABET, REAL_FOLDSEEK_3DI_TO_IDX
+# Import our CUDA components
+from spline.sequence_to_3di_cuda import SPLINE_CONFIG, AA_TO_IDX
+from enhanced_real_trainer_fixed_cuda import REAL_FOLDSEEK_3DI_ALPHABET, REAL_FOLDSEEK_3DI_TO_IDX
 
 print("🚀 ULTIMATE CUDA TRAINER - RTX 16GB Ada Optimized")
 print("="*80)
