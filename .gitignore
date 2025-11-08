@@ -161,6 +161,10 @@ cython_debug/
 
 # Project specific
 deprecated/
+huge/
 foldseek/
 .claude
 .DS_Store
+
+*.fasta
+*.tsv

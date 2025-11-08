@@ -1,0 +1,8 @@
+{
+  "train_losses": [],
+  "val_losses": [],
+  "vocab_diversity": [],
+  "epochs": [],
+  "best_val_loss": Infinity,
+  "best_epoch": 0
+}

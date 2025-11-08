@@ -12,7 +12,7 @@ import time
 from tqdm import tqdm
 
 # Import our models (but override 3Di character set)
-from sequence_to_3di import SequenceTo3DiModel, SPLINE_CONFIG, AA_TO_IDX, IDX_TO_AA, SequenceDataset
+from spline.sequence_to_3di import SequenceTo3DiModel, SPLINE_CONFIG, AA_TO_IDX, IDX_TO_AA, SequenceDataset
 
 # CORRECTED 3Di alphabet based on actual data analysis
 REAL_FOLDSEEK_3DI_ALPHABET = "ACDEFGHIKLMNPQRSTVWY"  # The actual characters found in data
