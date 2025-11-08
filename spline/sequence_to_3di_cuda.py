@@ -11,7 +11,7 @@ import torch.optim as optim
 import numpy as np
 from typing import List, Tuple, Optional
 
-print("🔬 Sequence → 3Di CUDA Model")
+print("Sequence -> 3Di CUDA Model")
 print("=" * 50)
 
 # ============================================================================
@@ -39,7 +39,7 @@ SPLINE_CONFIG = {
     'dropout_rate': 0.1,
 }
 
-print("📋 Spline Model Configuration:")
+print("Spline Model Configuration:")
 for key, value in SPLINE_CONFIG.items():
     print(f"  {key}: {value}")
 
@@ -225,7 +225,7 @@ class CudaSequenceDataset(torch.utils.data.Dataset):
 
     def __init__(self, pairs: List[Tuple[str, str]]):
         self.pairs = pairs
-        print(f"📋 CUDA Dataset initialized with {len(pairs)} sequence pairs")
+        print(f"CUDA Dataset initialized with {len(pairs)} sequence pairs")
 
     def __len__(self):
         return len(self.pairs)
@@ -252,7 +252,7 @@ class CudaSequenceDataset(torch.utils.data.Dataset):
 def train_sequence_to_3di_model_cuda():
     """Train the CUDA-optimized sequence → 3Di model"""
 
-    print("\n🚀 Training CUDA Sequence → 3Di Model")
+    print("\nTraining CUDA Sequence -> 3Di Model")
     print("-" * 50)
 
     # Check CUDA availability
@@ -288,7 +288,7 @@ def train_sequence_to_3di_model_cuda():
     # Training loop
     num_epochs = 30
 
-    print(f"📋 Training configuration:")
+    print(f"Training configuration:")
     print(f"  Device: {device}")
     print(f"  Epochs: {num_epochs}")
     print(f"  Batch size: {dataloader.batch_size}")
@@ -365,10 +365,10 @@ def predict_3di_sequence_cuda(model, amino_sequence: str, device: torch.device) 
 # ============================================================================
 
 if __name__ == "__main__":
-    print("\n🔬 SEQUENCE → 3Di CUDA MODEL")
+    print("\nSEQUENCE -> 3Di CUDA MODEL")
     print("=" * 60)
 
-    print("\n🎯 Model Objective:")
+    print("\nModel Objective:")
     print("  Amino Acid Sequence → 3Di Structural Tokens")
     print("  CUDA-optimized for RTX Ada deployment")
 
@@ -399,7 +399,7 @@ if __name__ == "__main__":
                 'config': SPLINE_CONFIG,
                 'losses': losses
             }, '/tmp/cuda_sequence_to_3di_model.pth')
-            print("\n💾 Model saved to /tmp/cuda_sequence_to_3di_model.pth")
+            print("\nModel saved to /tmp/cuda_sequence_to_3di_model.pth")
 
     except Exception as e:
         print(f"❌ Training failed: {e}")
@@ -407,5 +407,5 @@ if __name__ == "__main__":
         traceback.print_exc()
 
     print("\n" + "=" * 60)
-    print("🔬 CUDA Sequence → 3Di Model Complete!")
+    print("CUDA Sequence -> 3Di Model Complete!")
     print("=" * 60)

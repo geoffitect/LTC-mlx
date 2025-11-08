@@ -1,6 +1,6 @@
 #============================================================
 # ULTIMATE CUDA TRAINER - RTX 16GB Ada Optimized
-# High-performance CUDA training for AA → 3Di protein folding
+# High-performance CUDA training for AA -> 3Di protein folding
 # Optimized for RTX Ada architecture with 16GB VRAM
 #============================================================
 
@@ -24,16 +24,16 @@ import random
 from spline.sequence_to_3di_cuda import SPLINE_CONFIG, AA_TO_IDX
 from enhanced_real_trainer_fixed_cuda import REAL_FOLDSEEK_3DI_ALPHABET, REAL_FOLDSEEK_3DI_TO_IDX
 
-print("🚀 ULTIMATE CUDA TRAINER - RTX 16GB Ada Optimized")
+print(">> ULTIMATE CUDA TRAINER - RTX 16GB Ada Optimized")
 print("="*80)
 
 # Ensure CUDA is available
 if not torch.cuda.is_available():
-    print("❌ CUDA not available! Please install CUDA PyTorch.")
+    print("ERROR: CUDA not available! Please install CUDA PyTorch.")
     exit(1)
 
-print(f"🔥 Using device: {torch.cuda.get_device_name()}")
-print(f"💾 CUDA Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+print(f"FIRE: Using device: {torch.cuda.get_device_name()}")
+print(f"MEMORY: CUDA Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
 
 class LTCCell(nn.Module):
     """CUDA-optimized Liquid Time Constant cell with spline dynamics"""
@@ -110,7 +110,7 @@ class LTCCell(nn.Module):
         return h_new, c_new
 
 class ProteinLTCModel(nn.Module):
-    """CUDA-optimized LTC model for AA → 3Di prediction"""
+    """CUDA-optimized LTC model for AA -> 3Di prediction"""
     def __init__(self, config: Dict):
         super().__init__()
         self.config = config
@@ -172,8 +172,9 @@ class ProteinLTCModel(nn.Module):
             x_t = embedded[:, t, :]  # [batch, embed_dim]
 
             for layer_idx, ltc_layer in enumerate(self.ltc_layers):
-                x_t, hidden_states[layer_idx] = ltc_layer(x_t, hidden_states[layer_idx])
-                x_t = self.layer_norms[layer_idx](x_t)
+                h_new, c_new = ltc_layer(x_t, hidden_states[layer_idx])
+                hidden_states[layer_idx] = (h_new, c_new)
+                x_t = self.layer_norms[layer_idx](h_new)
                 if layer_idx < len(self.ltc_layers) - 1:  # No dropout on final layer
                     x_t = self.dropout(x_t)
 
@@ -205,7 +206,7 @@ class ProteinDataset(Dataset):
         self.struct_sequences = struct_sequences
         self.seq_len = seq_len
 
-        print(f"📊 ProteinDataset: {len(aa_sequences):,} sequences")
+        print(f"STATS: ProteinDataset: {len(aa_sequences):,} sequences")
 
     def __len__(self):
         return len(self.aa_sequences)
@@ -238,16 +239,16 @@ class UltimateCudaTrainer:
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cuda.matmul.allow_tf32 = True
 
-        print(f"🔧 CUDA Optimizations enabled")
-        print(f"📊 cuDNN benchmark: {torch.backends.cudnn.benchmark}")
-        print(f"⚡ TF32 enabled: {torch.backends.cuda.matmul.allow_tf32}")
+        print(f"CONFIG: CUDA Optimizations enabled")
+        print(f"STATS: cuDNN benchmark: {torch.backends.cudnn.benchmark}")
+        print(f"SPEED: TF32 enabled: {torch.backends.cuda.matmul.allow_tf32}")
 
     def load_data(self) -> Tuple[List[str], List[str]]:
         """Load and validate the complete 550k dataset"""
-        print("📖 Loading COMPLETE 550k dataset...")
+        print("LOAD: Loading COMPLETE 550k dataset...")
 
         # Load amino acid sequences from FASTA
-        print("📖 Loading amino acid sequences from FASTA...")
+        print("LOAD: Loading amino acid sequences from FASTA...")
         aa_dict = {}
         current_header = None
         current_seq = ""
@@ -268,10 +269,10 @@ class UltimateCudaTrainer:
                 header_id = current_header.split()[0]
                 aa_dict[header_id] = current_seq
 
-        print(f"✅ Loaded {len(aa_dict):,} amino acid sequences")
+        print(f"OK: Loaded {len(aa_dict):,} amino acid sequences")
 
         # Load 3Di sequences from TSV
-        print("📖 Loading 3Di sequences from TSV...")
+        print("LOAD: Loading 3Di sequences from TSV...")
         struct_dict = {}
 
         with open("3di_sequences.tsv", 'r') as f:
@@ -282,12 +283,12 @@ class UltimateCudaTrainer:
                     struct_seq = parts[1].strip()
                     struct_dict[seq_id] = struct_seq
 
-        print(f"✅ Loaded {len(struct_dict):,} 3Di sequences")
+        print(f"OK: Loaded {len(struct_dict):,} 3Di sequences")
 
         # Align sequences by header ID
-        print("🔍 Aligning sequences by header ID and validating...")
+        print("SEARCH: Aligning sequences by header ID and validating...")
         common_headers = set(aa_dict.keys()) & set(struct_dict.keys())
-        print(f"📊 Common headers: {len(common_headers):,}")
+        print(f"STATS: Common headers: {len(common_headers):,}")
 
         # Validate sequences
         valid_aa_sequences = []
@@ -314,14 +315,14 @@ class UltimateCudaTrainer:
             valid_aa_sequences.append(aa_seq)
             valid_struct_sequences.append(struct_seq)
 
-        print(f"✅ Loaded {len(valid_aa_sequences):,} valid sequence pairs")
-        print(f"📈 Success rate: {len(valid_aa_sequences)/len(common_headers)*100:.1f}%")
+        print(f"OK: Loaded {len(valid_aa_sequences):,} valid sequence pairs")
+        print(f"STATS: Success rate: {len(valid_aa_sequences)/len(common_headers)*100:.1f}%")
 
         return valid_aa_sequences, valid_struct_sequences
 
     def compute_adaptive_weights(self, struct_sequences: List[str], sample_size: int = 50000) -> torch.Tensor:
         """Compute adaptive class weights for CUDA training"""
-        print("🧠 Computing character frequencies for adaptive weights...")
+        print("BRAIN: Computing character frequencies for adaptive weights...")
 
         # Sample sequences for frequency analysis
         sample_indices = random.sample(range(len(struct_sequences)),
@@ -336,23 +337,23 @@ class UltimateCudaTrainer:
                 char_counts[char] += 1
                 total_chars += 1
 
-        print(f"📊 Analyzed {total_chars:,} characters from {len(sample_indices):,} sequences")
+        print(f"STATS: Analyzed {total_chars:,} characters from {len(sample_indices):,} sequences")
 
         # Compute inverse frequency weights
         weights = torch.ones(len(REAL_FOLDSEEK_3DI_ALPHABET))
 
-        print("📈 Character frequency distribution:")
+        print("STATS: Character frequency distribution:")
         for i, char in enumerate(REAL_FOLDSEEK_3DI_ALPHABET):
             freq = char_counts.get(char, 1) / total_chars
             weight = 1.0 / freq
             weights[i] = weight
-            print(f"   {char}: {freq:.4f} freq → {weight:.2f} weight")
+            print(f"   {char}: {freq:.4f} freq -> {weight:.2f} weight")
 
         return weights.cuda()
 
     def auto_batch_size(self, model: nn.Module, sample_data: torch.Tensor) -> int:
         """Auto-detect optimal batch size for RTX 16GB"""
-        print("🔍 Auto-detecting optimal batch size for RTX Ada...")
+        print("SEARCH: Auto-detecting optimal batch size for RTX Ada...")
 
         model.eval()
         optimal_batch_size = 32  # Conservative start
@@ -391,7 +392,7 @@ class UltimateCudaTrainer:
                     raise e
 
         torch.cuda.empty_cache()
-        print(f"🎯 Selected optimal batch size: {optimal_batch_size}")
+        print(f"TARGET: Selected optimal batch size: {optimal_batch_size}")
         return optimal_batch_size
 
     def train(self, epochs: int = 100, lr: float = 0.0002):
@@ -409,9 +410,9 @@ class UltimateCudaTrainer:
         val_aa = aa_sequences[split_idx:]
         val_struct = struct_sequences[split_idx:]
 
-        print("🔀 Data split:")
-        print(f"  🔵 TRAIN: {len(train_aa):,} pairs")
-        print(f"  🟡 VAL: {len(val_aa):,} pairs")
+        print("SPLIT: Data split:")
+        print(f"  TRAIN: {len(train_aa):,} pairs")
+        print(f"  VAL: {len(val_aa):,} pairs")
 
         # Create datasets
         train_dataset = ProteinDataset(train_aa, train_struct, self.config['seq_len'])
@@ -419,12 +420,12 @@ class UltimateCudaTrainer:
 
         # Initialize model
         model = ProteinLTCModel(self.config).cuda()
-        print(f"🧠 ProteinLTCModel initialized:")
-        print(f"  📏 Sequence length: {self.config['seq_len']}")
-        print(f"  🧬 AA vocab size: {self.config['aa_vocab_size']}")
-        print(f"  🔬 3Di vocab size: {self.config['struct_vocab_size']}")
-        print(f"  🧠 Hidden dimensions: {self.config['hidden_dim']}")
-        print(f"  🏗️  LTC layers: {self.config['num_layers']}")
+        print(f"BRAIN: ProteinLTCModel initialized:")
+        print(f"  LENGTH: Sequence length: {self.config['seq_len']}")
+        print(f"  VOCAB: AA vocab size: {self.config['aa_vocab_size']}")
+        print(f"  VOCAB: 3Di vocab size: {self.config['struct_vocab_size']}")
+        print(f"  BRAIN: Hidden dimensions: {self.config['hidden_dim']}")
+        print(f"  BUILD: LTC layers: {self.config['num_layers']}")
 
         # Auto-detect batch size
         sample_data = torch.zeros(32, self.config['seq_len'], dtype=torch.long)
@@ -455,7 +456,7 @@ class UltimateCudaTrainer:
             adaptive_weights_tensor
         ).cuda()
 
-        print(f"🎯 AdaptiveWeights initialized with {len(REAL_FOLDSEEK_3DI_ALPHABET)} classes")
+        print(f"TARGET: AdaptiveWeights initialized with {len(REAL_FOLDSEEK_3DI_ALPHABET)} classes")
 
         # Optimizer with CUDA-optimized settings
         optimizer = optim.AdamW([
@@ -471,13 +472,13 @@ class UltimateCudaTrainer:
         # Mixed precision scaler for RTX Ada
         scaler = GradScaler('cuda')
 
-        print("🚀 Training configuration:")
-        print(f"  📊 Dataset: {len(train_aa):,} training pairs")
-        print(f"  🔄 Epochs: {epochs}")
-        print(f"  🎯 Batch size: {batch_size}")
-        print(f"  📈 Learning rate: {lr}")
-        print(f"  ⚡ Mixed precision: Enabled")
-        print(f"  🔧 Fused optimizer: Enabled")
+        print(">> Training configuration:")
+        print(f"  STATS: Dataset: {len(train_aa):,} training pairs")
+        print(f"  CYCLES: Epochs: {epochs}")
+        print(f"  TARGET: Batch size: {batch_size}")
+        print(f"  STATS: Learning rate: {lr}")
+        print(f"  SPEED: Mixed precision: Enabled")
+        print(f"  CONFIG: Fused optimizer: Enabled")
 
         # Training loop
         history = {
@@ -489,7 +490,7 @@ class UltimateCudaTrainer:
         best_val_loss = float('inf')
 
         for epoch in range(epochs):
-            print(f"\n📍 EPOCH {epoch+1}/{epochs}")
+            print(f"\nEPOCH: EPOCH {epoch+1}/{epochs}")
 
             # Training phase
             model.train()
@@ -585,14 +586,14 @@ class UltimateCudaTrainer:
             history['val_loss'].append(avg_val_loss)
             history['learning_rates'].append(optimizer.param_groups[0]['lr'])
 
-            print(f"  📊 Train Loss: {avg_train_loss:.4f}")
-            print(f"  📊 Val Loss: {avg_val_loss:.4f}")
-            print(f"  📈 Learning Rate: {optimizer.param_groups[0]['lr']:.2e}")
+            print(f"  STATS: Train Loss: {avg_train_loss:.4f}")
+            print(f"  STATS: Val Loss: {avg_val_loss:.4f}")
+            print(f"  STATS: Learning Rate: {optimizer.param_groups[0]['lr']:.2e}")
 
             # Save best model
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                print("  💾 Saving best model...")
+                print("  SAVE: Saving best model...")
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
@@ -605,7 +606,7 @@ class UltimateCudaTrainer:
 
             # Checkpoint every 10 epochs
             if (epoch + 1) % 10 == 0:
-                print("  💾 Saving checkpoint...")
+                print("  SAVE: Saving checkpoint...")
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
@@ -618,13 +619,13 @@ class UltimateCudaTrainer:
                     'history': history
                 }, f"/tmp/cuda_ltc_checkpoint_epoch_{epoch+1}.pth")
 
-        print("\n🎉 CUDA TRAINING COMPLETE!")
-        print(f"✅ Best validation loss: {best_val_loss:.4f}")
+        print("\nSUCCESS: CUDA TRAINING COMPLETE!")
+        print(f"OK: Best validation loss: {best_val_loss:.4f}")
 
         return model, adaptive_weights, history
 
 if __name__ == "__main__":
-    print("🚀 ULTIMATE CUDA TRAINER")
+    print(">> ULTIMATE CUDA TRAINER")
     print("="*80)
 
     # CUDA-optimized configuration for RTX 16GB
@@ -644,17 +645,17 @@ if __name__ == "__main__":
         trainer = UltimateCudaTrainer(cuda_config)
 
         # Start training
-        print("🚀 Starting Ultimate CUDA Training!")
+        print(">> Starting Ultimate CUDA Training!")
         model, adaptive_weights, history = trainer.train()
 
-        print("\n🎉 CUDA TRAINING SUCCESS!")
+        print("\nSUCCESS: CUDA TRAINING SUCCESS!")
         print("="*60)
-        print("✅ Model training completed")
-        print("✅ Best model saved")
-        print("✅ Checkpoints created")
-        print("\n🚀 Ready for high-speed protein folding on RTX Ada!")
+        print("OK: Model training completed")
+        print("OK: Best model saved")
+        print("OK: Checkpoints created")
+        print("\n>> Ready for high-speed protein folding on RTX Ada!")
 
     except Exception as e:
-        print(f"❌ Training failed: {e}")
+        print(f"ERROR: Training failed: {e}")
         import traceback
         traceback.print_exc()
