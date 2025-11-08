@@ -157,8 +157,8 @@ print("=" * 80)
 import mlx.core as mx
 import mlx.nn as mlx_nn
 import mlx.optimizers as mlx_optim
-from ltc_mlx_fixed import RandomWiring as RandomWiringMLX
-from ltc_mlx_fixed import LTCRNN as LTCRNNMLX
+from ltc_mlx import RandomWiring as RandomWiringMLX
+from ltc_mlx import LTCRNN as LTCRNNMLX
 
 # Set MLX seed
 mx.random.seed(42)

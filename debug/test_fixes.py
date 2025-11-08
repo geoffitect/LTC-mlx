@@ -10,7 +10,7 @@ def quick_test_mlx():
     print("🧪 Testing MLX fixes (100 epochs)...")
 
     try:
-        from ltc_mlx_fixed import LTCRNN as MLXLTCRNN, RandomWiring as MLXRandomWiring, generate_spiral_data
+        from ltc_mlx import LTCRNN as MLXLTCRNN, RandomWiring as MLXRandomWiring, generate_spiral_data
         import mlx.core as mx
         import mlx.nn as mlx_nn
         import mlx.optimizers as mlx_optim

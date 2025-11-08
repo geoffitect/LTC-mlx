@@ -171,7 +171,7 @@ def benchmark_mlx():
     import mlx.core as mx
     import mlx.nn as mlx_nn
     import mlx.optimizers as mlx_optim
-    from ltc_mlx_fixed import RandomWiring, LTCRNN
+    from ltc_mlx import RandomWiring, LTCRNN
 
     mx.random.seed(42)
     np.random.seed(42)

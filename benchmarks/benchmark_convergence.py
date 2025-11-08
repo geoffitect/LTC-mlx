@@ -151,7 +151,7 @@ def train_mlx_to_convergence(target_loss):
     import mlx.core as mx
     import mlx.nn as mlx_nn
     import mlx.optimizers as mlx_optim
-    from ltc_mlx_fixed import RandomWiring, LTCRNN
+    from ltc_mlx import RandomWiring, LTCRNN
 
     # Set seeds
     mx.random.seed(42)

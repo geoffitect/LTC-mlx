@@ -6,7 +6,7 @@ import mlx.core as mx
 import numpy as np
 
 def debug_shapes():
-    from ltc_mlx_fixed import RandomWiring, LIFNeuronLayer
+    from ltc_mlx import RandomWiring, LIFNeuronLayer
 
     # Create test configuration
     input_dim = 2
