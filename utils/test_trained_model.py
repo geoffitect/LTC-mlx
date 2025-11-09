@@ -4,7 +4,6 @@
 #============================================================
 
 import mlx.core as mx
-import mlx.nn as nn
 import numpy as np
 from typing import Dict
 import time
@@ -12,7 +11,7 @@ from collections import Counter
 
 # Import our components
 from spline.sequence_to_3di import SequenceTo3DiModel, SPLINE_CONFIG, AA_TO_IDX
-from enhanced_real_trainer_fixed import REAL_FOLDSEEK_3DI_ALPHABET, REAL_FOLDSEEK_3DI_TO_IDX
+from utils.aa2fold_trainer import REAL_FOLDSEEK_3DI_ALPHABET, REAL_FOLDSEEK_3DI_TO_IDX
 
 print("🚀 TESTING TRAINED FULL MONTE MODEL")
 print("=" * 60)

@@ -4,7 +4,7 @@
 #============================================================
 
 from typing import List, Tuple, Dict
-import time
+
 
 print("🔧 Correct Sequence Alignment - Index-Based Matching")
 print("=" * 60)
@@ -109,7 +109,7 @@ class CorrectSequenceAligner:
             'valid_pairs': 0
         }
 
-        from enhanced_real_trainer_fixed import REAL_FOLDSEEK_3DI_ALPHABET, AA_TO_IDX
+        from utils.aa2fold_trainer import REAL_FOLDSEEK_3DI_ALPHABET, AA_TO_IDX
         valid_3di_chars = set(REAL_FOLDSEEK_3DI_ALPHABET)
 
         count = 0

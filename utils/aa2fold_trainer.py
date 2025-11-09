@@ -7,12 +7,12 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 import numpy as np
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple
 import time
 from tqdm import tqdm
 
 # Import our models (but override 3Di character set)
-from spline.sequence_to_3di import SequenceTo3DiModel, SPLINE_CONFIG, AA_TO_IDX, IDX_TO_AA, SequenceDataset
+from spline.sequence_to_3di import SequenceTo3DiModel, SPLINE_CONFIG, AA_TO_IDX
 
 # CORRECTED 3Di alphabet based on actual data analysis
 REAL_FOLDSEEK_3DI_ALPHABET = "ACDEFGHIKLMNPQRSTVWY"  # The actual characters found in data

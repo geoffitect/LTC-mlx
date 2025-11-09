@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-import numpy as np
 import random
 import time
 import os
@@ -18,7 +17,7 @@ from tqdm import tqdm
 from collections import Counter
 
 # Import constants from our working modules
-from enhanced_real_trainer_fixed import REAL_FOLDSEEK_3DI_ALPHABET, REAL_FOLDSEEK_3DI_TO_IDX
+from utils.aa2fold_trainer import REAL_FOLDSEEK_3DI_ALPHABET, REAL_FOLDSEEK_3DI_TO_IDX
 from spline.sequence_to_3di import AA_TO_IDX
 
 print("🚀 ULTIMATE PYTORCH TRAINER - 550K Protein Training")
@@ -31,13 +30,13 @@ PYTORCH_CONFIG = {
     'struct_vocab_size': 20,
     'embedding_dim': 128,
     'hidden_dim': 256,
-    'num_layers': 2,
+    'num_layers': 5,
     'dropout_rate': 0.1,
     'learning_rate': 0.0002,
-    'batch_size': 128,  # Start with this, can auto-tune
+    'batch_size': 256,  # Start with this, can auto-tune
     'epochs': 100,
-    'checkpoint_every': 5,
-    'validation_every': 10,
+    'checkpoint_every': 4,
+    'validation_every': 2,
 }
 
 # Device setup
