@@ -45,7 +45,7 @@ class SequentialLTCCell(nn.Module):
         self.hidden_size = hidden_size
 
         # Simple LTC dynamics
-        self.tau = nn.Parameter(torch.uniform(0.1, 2.0, (hidden_size,)))
+        self.tau = nn.Parameter(torch.rand(hidden_size) * 1.9 + 0.1)  # uniform(0.1, 2.0)
         self.A = nn.Parameter(torch.randn(hidden_size, hidden_size) * 0.1)
         self.b = nn.Parameter(torch.zeros(hidden_size))
         self.input_proj = nn.Linear(input_size, hidden_size)
@@ -89,7 +89,7 @@ class ParallelLTCCell(nn.Module):
         self.hidden_size = hidden_size
 
         # Same parameters as sequential version
-        self.tau = nn.Parameter(torch.uniform(0.1, 2.0, (hidden_size,)))
+        self.tau = nn.Parameter(torch.rand(hidden_size) * 1.9 + 0.1)  # uniform(0.1, 2.0)
         self.A = nn.Parameter(torch.randn(hidden_size, hidden_size) * 0.1)
         self.b = nn.Parameter(torch.zeros(hidden_size))
         self.input_proj = nn.Linear(input_size, hidden_size)

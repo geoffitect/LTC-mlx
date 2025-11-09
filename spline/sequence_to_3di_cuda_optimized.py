@@ -100,7 +100,7 @@ class ParallelLTCLayer(nn.Module):
         self.input_proj = nn.Linear(input_dim, hidden_dim)
 
         # LTC dynamics parameters (learnable) - BROADCAST to all timesteps
-        self.tau = nn.Parameter(torch.uniform(0.1, 2.0, (hidden_dim,)))
+        self.tau = nn.Parameter(torch.rand(hidden_dim) * 1.9 + 0.1)  # uniform(0.1, 2.0)
         self.A = nn.Parameter(torch.randn(hidden_dim, hidden_dim) * 0.1)
         self.b = nn.Parameter(torch.zeros(hidden_dim))
 
