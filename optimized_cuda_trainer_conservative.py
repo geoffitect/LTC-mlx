@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-OPTIMIZED CUDA TRAINER - Fixed Sequential Bottleneck
-Ultra-fast CUDA implementation with parallelized LTC processing
-Based on train_torch.py but optimized for multi-GPU CUDA deployment
+CONSERVATIVE CUDA TRAINER - Fixed Multiprocessing and Memory Issues
+Ultra-stable CUDA implementation for RTX 4060 Ti with 16GB VRAM
+Fixes: forking issues, aggressive batch sizes, memory leaks
 """
 
 import torch
@@ -17,8 +17,6 @@ import os
 from typing import List, Tuple, Dict
 from tqdm import tqdm
 from collections import Counter
-import multiprocessing as mp
-from functools import partial
 
 # Import constants from PyTorch-compatible modules
 from utils.aa2fold_trainer_pytorch import (
@@ -28,11 +26,11 @@ from utils.aa2fold_trainer_pytorch import (
     get_validated_sequences
 )
 
-print("🚀 OPTIMIZED CUDA TRAINER - Sequential Bottleneck Fixed")
+print("🛡️ CONSERVATIVE CUDA TRAINER - Stability First")
 print("=" * 80)
 
-# Enhanced configuration with CUDA optimizations
-OPTIMIZED_CONFIG = {
+# CONSERVATIVE configuration optimized for RTX 4060 Ti
+CONSERVATIVE_CONFIG = {
     'seq_len': 512,
     'aa_vocab_size': 20,
     'struct_vocab_size': 20,
@@ -41,167 +39,151 @@ OPTIMIZED_CONFIG = {
     'num_layers': 5,
     'dropout_rate': 0.1,
     'learning_rate': 0.0002,
-    'batch_size': 256,  # Conservative power of 2 for stability
+    'batch_size': 128,  # Conservative power of 2 for 16GB VRAM
     'epochs': 100,
-    'checkpoint_every': 4,
+    'checkpoint_every': 5,
     'validation_every': 2,
     'use_mixed_precision': True,
-    'gradient_accumulation_steps': 4,  # Effective batch size = 4096
+    'gradient_accumulation_steps': 2,  # Effective batch size = 256
 }
 
-# Multi-GPU setup
-device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+# Device setup with conservative memory management
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"🔥 Using device: {device}")
 
 if torch.cuda.is_available():
     print(f"🔥 GPU: {torch.cuda.get_device_name()}")
     print(f"💾 VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
-    # Enable CUDA optimizations
+
+    # Conservative CUDA optimizations
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.enabled = True
 
-class OptimizedLTCCell(nn.Module):
-    """
-    CRITICAL FIX: Parallelized LTC cell that processes entire sequences simultaneously
-    This eliminates the sequential bottleneck that made CUDA slower than MPS
-    """
+    # Set memory fraction to prevent OOM
+    torch.cuda.set_per_process_memory_fraction(0.8)  # Use only 80% of VRAM
+
+class ConservativeLTCCell(nn.Module):
+    """Conservative LTC cell with memory-efficient parallel processing"""
 
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
 
-        # Spline transformation layers - FULLY PARALLELIZABLE
+        # Memory-efficient spline transformation
         self.spline_net = nn.Sequential(
-            nn.Linear(input_size + hidden_size, hidden_size * 2),
+            nn.Linear(input_size + hidden_size, hidden_size),
             nn.Tanh(),
-            nn.Linear(hidden_size * 2, hidden_size),
+            nn.Linear(hidden_size, hidden_size),
             nn.Tanh()
         )
 
-        # Time constant learning - FULLY PARALLELIZABLE
+        # Conservative time constant learning
         self.tau_net = nn.Linear(input_size + hidden_size, hidden_size)
 
-        # Sensory processing - FULLY PARALLELIZABLE
+        # Conservative sensory processing
         self.sensory_mu = nn.Linear(input_size, hidden_size)
         self.sensory_sigma = nn.Linear(input_size, hidden_size)
 
     def forward(self, inputs: torch.Tensor, hidden: torch.Tensor, dt: float = 0.1):
-        """
-        OPTIMIZED: Forward pass with PARALLEL LTC dynamics
+        """Memory-efficient parallel LTC dynamics"""
 
-        Key insight: Process ALL timesteps simultaneously using vectorized operations
-        This is what makes train_torch.py fast and eliminates the CUDA bottleneck
-
-        Args:
-            inputs: [batch, seq_len, input_size] - ALL TIMESTEPS AT ONCE
-            hidden: [batch, seq_len, hidden_size] - ALL TIMESTEPS AT ONCE
-
-        Returns:
-            new_hidden: [batch, seq_len, hidden_size] - ALL TIMESTEPS AT ONCE
-        """
+        # Process in smaller chunks if needed to save memory
         batch_size, seq_len, _ = inputs.shape
 
-        # PARALLEL OPERATIONS - All 512 timesteps computed simultaneously! ⚡
+        # Combine input and hidden state
+        combined = torch.cat([inputs, hidden], dim=-1)
 
-        # Combine input and hidden state for ALL timesteps
-        combined = torch.cat([inputs, hidden], dim=-1)  # [batch, seq, combined_dim]
+        # Parallel spline transformation
+        spline_features = self.spline_net(combined)
 
-        # Spline transformation - PARALLEL across sequence dimension
-        spline_features = self.spline_net(combined)  # [batch, seq, hidden]
+        # Parallel time constants
+        tau = torch.sigmoid(self.tau_net(combined)) * 0.9 + 0.1
 
-        # Time constants - PARALLEL across sequence dimension
-        tau = torch.sigmoid(self.tau_net(combined)) * 0.9 + 0.1  # [batch, seq, hidden]
+        # Parallel sensory processing
+        mu = self.sensory_mu(inputs)
+        sigma = torch.sigmoid(self.sensory_sigma(inputs))
 
-        # Sensory processing - PARALLEL across sequence dimension
-        mu = self.sensory_mu(inputs)  # [batch, seq, hidden]
-        sigma = torch.sigmoid(self.sensory_sigma(inputs))  # [batch, seq, hidden]
-
-        # LTC dynamics: dh/dt = (-h + f(x)) / tau - FULLY PARALLEL! ⚡
-        target_state = spline_features + mu * sigma  # [batch, seq, hidden]
-        dh_dt = (-hidden + target_state) / (tau + 1e-8)  # [batch, seq, hidden]
-        new_hidden = hidden + dt * dh_dt  # [batch, seq, hidden]
+        # LTC dynamics - fully parallel
+        target_state = spline_features + mu * sigma
+        dh_dt = (-hidden + target_state) / (tau + 1e-8)
+        new_hidden = hidden + dt * dh_dt
 
         return new_hidden
 
-class OptimizedProteinLTCModel(nn.Module):
-    """Complete protein sequence to 3Di structure model with CUDA optimizations"""
+class ConservativeProteinLTCModel(nn.Module):
+    """Conservative protein model with memory optimizations"""
 
     def __init__(self, config: Dict):
         super().__init__()
         self.config = config
 
-        # Amino acid embedding
+        # Conservative amino acid embedding
         self.aa_embedding = nn.Embedding(
             config['aa_vocab_size'],
             config['embedding_dim']
         )
 
-        # Optimized LTC layers - NO SEQUENTIAL LOOPS!
+        # Conservative LTC layers
         self.ltc_layers = nn.ModuleList()
         input_dim = config['embedding_dim']
 
         for _ in range(config['num_layers']):
-            ltc = OptimizedLTCCell(input_dim, config['hidden_dim'])
+            ltc = ConservativeLTCCell(input_dim, config['hidden_dim'])
             self.ltc_layers.append(ltc)
             input_dim = config['hidden_dim']
 
-        # Dropout for regularization
+        # Conservative dropout
         self.dropout = nn.Dropout(config['dropout_rate'])
 
-        # Output projection to 3Di vocabulary
+        # Conservative output projection
         self.output_projection = nn.Sequential(
-            nn.Linear(config['hidden_dim'], config['hidden_dim']),
+            nn.Linear(config['hidden_dim'], config['hidden_dim'] // 2),
             nn.ReLU(),
             nn.Dropout(config['dropout_rate']),
-            nn.Linear(config['hidden_dim'], config['struct_vocab_size'])
+            nn.Linear(config['hidden_dim'] // 2, config['struct_vocab_size'])
         )
 
-        print(f"🧠 OptimizedProteinLTCModel initialized:")
+        print(f"🛡️ ConservativeProteinLTCModel initialized:")
         print(f"  📏 Sequence length: {config['seq_len']}")
         print(f"  🧬 AA vocab size: {config['aa_vocab_size']}")
         print(f"  🔬 3Di vocab size: {config['struct_vocab_size']}")
         print(f"  🧠 Hidden dimensions: {config['hidden_dim']}")
-        print(f"  🏗️  Optimized LTC layers: {config['num_layers']}")
+        print(f"  🏗️  Conservative LTC layers: {config['num_layers']}")
 
     def forward(self, aa_sequences: torch.Tensor):
-        """
-        OPTIMIZED: Forward pass with PARALLEL sequence processing
-
-        Args:
-            aa_sequences: [batch, seq_len] amino acid token indices
-
-        Returns:
-            predictions: [batch, seq_len, struct_vocab_size] 3Di predictions
-        """
+        """Conservative forward pass with memory management"""
         batch_size, seq_len = aa_sequences.shape
 
         # Embed amino acids
-        embedded = self.aa_embedding(aa_sequences)  # [batch, seq, embed_dim]
+        embedded = self.aa_embedding(aa_sequences)
         embedded = self.dropout(embedded)
 
-        # Initialize hidden state for ALL timesteps
+        # Initialize hidden state conservatively
         hidden = torch.zeros(
             batch_size, seq_len, self.config['hidden_dim'],
             device=aa_sequences.device,
             dtype=embedded.dtype
         )
 
-        # Process through optimized LTC layers - ALL PARALLEL! ⚡
+        # Process through conservative LTC layers
         for ltc_layer in self.ltc_layers:
-            hidden = ltc_layer(embedded, hidden)  # Processes ALL timesteps at once
+            hidden = ltc_layer(embedded, hidden)
             embedded = hidden  # Feed to next layer
+
+            # Clear intermediate tensors to save memory
+            torch.cuda.empty_cache()
 
         # Apply dropout
         hidden = self.dropout(hidden)
 
         # Project to 3Di vocabulary
-        predictions = self.output_projection(hidden)  # [batch, seq, struct_vocab]
+        predictions = self.output_projection(hidden)
 
         return predictions
 
 class AdaptiveWeights(nn.Module):
-    """Learnable adaptive class weights to prevent mode collapse"""
+    """Learnable adaptive class weights - unchanged from original"""
 
     def __init__(self, num_classes: int, initial_freqs: torch.Tensor):
         super().__init__()
@@ -219,8 +201,8 @@ class AdaptiveWeights(nn.Module):
         """Return current adaptive weights"""
         return torch.exp(self.log_weights)
 
-class FastProteinDataset(Dataset):
-    """Optimized PyTorch dataset with memory-efficient loading"""
+class ConservativeProteinDataset(Dataset):
+    """Conservative dataset with minimal memory usage"""
 
     def __init__(self, aa_sequences: List[str], struct_sequences: List[str], config: Dict):
         self.aa_sequences = aa_sequences
@@ -228,87 +210,73 @@ class FastProteinDataset(Dataset):
         self.config = config
         self.seq_len = config['seq_len']
 
-        print(f"📊 FastProteinDataset: {len(aa_sequences):,} sequences")
-
-        # Pre-tokenize sequences for faster __getitem__
-        print("🔄 Pre-tokenizing sequences...")
-        self.aa_tokens = []
-        self.struct_tokens = []
-
-        for aa_seq, struct_seq in tqdm(zip(aa_sequences, struct_sequences),
-                                       total=len(aa_sequences),
-                                       desc="Pre-tokenizing"):
-            aa_tokens = [AA_TO_IDX.get(aa.upper(), 0) for aa in aa_seq]
-            struct_tokens = [REAL_FOLDSEEK_3DI_TO_IDX.get(char, 0) for char in struct_seq]
-
-            # Pad or truncate to fixed length
-            if len(aa_tokens) < self.seq_len:
-                aa_tokens.extend([0] * (self.seq_len - len(aa_tokens)))
-                struct_tokens.extend([0] * (self.seq_len - len(struct_tokens)))
-            else:
-                aa_tokens = aa_tokens[:self.seq_len]
-                struct_tokens = struct_tokens[:self.seq_len]
-
-            self.aa_tokens.append(aa_tokens)
-            self.struct_tokens.append(struct_tokens)
-
-        print("✅ Pre-tokenization complete!")
+        print(f"📊 ConservativeProteinDataset: {len(aa_sequences):,} sequences")
+        print("🛡️ Using lazy loading to conserve memory...")
 
     def __len__(self):
-        return len(self.aa_tokens)
+        return len(self.aa_sequences)
 
     def __getitem__(self, idx):
-        return (torch.tensor(self.aa_tokens[idx], dtype=torch.long),
-                torch.tensor(self.struct_tokens[idx], dtype=torch.long))
+        aa_seq = self.aa_sequences[idx]
+        struct_seq = self.struct_sequences[idx]
 
-# load_chunk function removed - now using PyTorch-compatible data loader
+        # Convert to token indices
+        aa_tokens = [AA_TO_IDX.get(aa.upper(), 0) for aa in aa_seq]
+        struct_tokens = [REAL_FOLDSEEK_3DI_TO_IDX.get(char, 0) for char in struct_seq]
 
-class OptimizedCudaTrainer:
-    """Ultra-optimized CUDA trainer with all performance fixes"""
+        # Pad or truncate to fixed length
+        if len(aa_tokens) < self.seq_len:
+            aa_tokens.extend([0] * (self.seq_len - len(aa_tokens)))
+            struct_tokens.extend([0] * (self.seq_len - len(struct_tokens)))
+        else:
+            aa_tokens = aa_tokens[:self.seq_len]
+            struct_tokens = struct_tokens[:self.seq_len]
+
+        return torch.tensor(aa_tokens, dtype=torch.long), torch.tensor(struct_tokens, dtype=torch.long)
+
+class ConservativeCudaTrainer:
+    """Ultra-conservative CUDA trainer for stability"""
 
     def __init__(self, config: Dict):
         self.config = config
         self.device = device
-        self.scaler = GradScaler() if config.get('use_mixed_precision', False) else None
+        self.scaler = GradScaler() if config.get('use_mixed_precision', False) and torch.cuda.is_available() else None
 
         # Create checkpoint directory
-        self.checkpoint_dir = "optimized_cuda_checkpoints"
+        self.checkpoint_dir = "conservative_cuda_checkpoints"
         os.makedirs(self.checkpoint_dir, exist_ok=True)
 
-        print(f"🔧 CUDA Optimizations:")
-        print(f"  🔄 Mixed precision: {config.get('use_mixed_precision', False)}")
+        print(f"🛡️ Conservative CUDA Optimizations:")
+        print(f"  🔄 Mixed precision: {config.get('use_mixed_precision', False) and torch.cuda.is_available()}")
         print(f"  📊 Gradient accumulation: {config.get('gradient_accumulation_steps', 1)}")
         print(f"  🚀 Batch size: {config['batch_size']}")
+        print(f"  💾 Memory management: Conservative")
 
-    def load_dataset_parallel(self) -> Tuple[List[str], List[str]]:
-        """Load dataset using optimized PyTorch-compatible loader"""
-        print("📖 Loading dataset with PyTorch-compatible optimized loader...")
+    def load_dataset_conservative(self) -> Tuple[List[str], List[str]]:
+        """Load dataset conservatively"""
+        print("📖 Loading dataset conservatively...")
 
         try:
-            # Use the new PyTorch-compatible data loader
+            # Use the PyTorch-compatible data loader with conservative limits
             aa_sequences, struct_sequences = get_validated_sequences(
-                max_pairs=550000,  # Load up to 550K pairs
+                max_pairs=100000,  # Conservative limit for testing
                 aa_file="aa_sequences.fasta",
                 tsv_file="3di_sequences.tsv"
             )
 
             print(f"✅ Loaded {len(aa_sequences):,} valid sequence pairs")
-            print(f"📈 PyTorch-compatible loading: SUCCESS")
-
             return aa_sequences, struct_sequences
 
         except Exception as e:
-            print(f"❌ PyTorch loader failed: {e}")
-            print("🔄 Falling back to simple loading...")
+            print(f"❌ Data loading failed: {e}")
+            print("🧪 Falling back to test data generation...")
 
-            # Fallback to simple loading if files don't exist in expected location
+            # Generate conservative test data
             aa_sequences = []
             struct_sequences = []
 
-            # Generate some test data for testing
-            print("🧪 Generating test data for demonstration...")
-            for i in range(1000):
-                aa_seq = ''.join(np.random.choice(list(AA_TO_IDX.keys()), size=np.random.randint(50, 200)))
+            for i in range(1000):  # Small test set
+                aa_seq = ''.join(np.random.choice(list(AA_TO_IDX.keys()), size=np.random.randint(100, 300)))
                 struct_seq = ''.join(np.random.choice(list(REAL_FOLDSEEK_3DI_TO_IDX.keys()), size=len(aa_seq)))
                 aa_sequences.append(aa_seq)
                 struct_sequences.append(struct_seq)
@@ -316,14 +284,13 @@ class OptimizedCudaTrainer:
             print(f"✅ Generated {len(aa_sequences):,} test sequence pairs")
             return aa_sequences, struct_sequences
 
-    def compute_character_frequencies(self, struct_sequences: List[str], sample_size: int = 50000) -> torch.Tensor:
-        """Compute character frequencies for adaptive weighting"""
-        print("🧠 Computing character frequencies...")
+    def compute_character_frequencies(self, struct_sequences: List[str], sample_size: int = 10000) -> torch.Tensor:
+        """Conservative character frequency computation"""
+        print("🧠 Computing character frequencies (conservative)...")
 
-        # Sample for frequency analysis
+        # Conservative sample size
         sample_seqs = random.sample(struct_sequences, min(sample_size, len(struct_sequences)))
 
-        # Count characters
         char_counts = Counter()
         total_chars = 0
 
@@ -343,59 +310,17 @@ class OptimizedCudaTrainer:
         print(f"📊 Analyzed {total_chars:,} characters from {len(sample_seqs):,} sequences")
         return frequencies
 
-    def auto_optimize_batch_size(self, model: nn.Module, sample_data: torch.Tensor) -> int:
-        """Conservative batch size optimization - powers of 2 only"""
-        print("🔍 Auto-optimizing batch size for GPU (conservative)...")
-
-        model.eval()
-        optimal_size = 64  # Conservative starting point
-
-        # Test only powers of 2 for better memory alignment
-        for batch_size in [64, 128, 256, 512]:
-            try:
-                # Clear cache
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-
-                # Create test batch
-                batch_aa = sample_data[:batch_size].to(self.device)
-
-                # Test forward pass with mixed precision
-                start_time = time.time()
-                with torch.no_grad():
-                    if self.scaler:
-                        with autocast(device_type='cuda'):
-                            _ = model(batch_aa)
-                    else:
-                        _ = model(batch_aa)
-                forward_time = time.time() - start_time
-
-                print(f"   Testing batch size {batch_size}: {forward_time:.3f}s")
-                optimal_size = batch_size
-
-            except RuntimeError as e:
-                if "out of memory" in str(e).lower():
-                    print(f"   ❌ Batch size {batch_size}: out of memory")
-                    break
-                else:
-                    print(f"   ❌ Batch size {batch_size}: {e}")
-                    break
-
-        # No safety margin needed - we're already conservative
-        print(f"🎯 Conservative batch size: {optimal_size}")
-        return optimal_size
-
     def train(self):
-        """Main optimized training loop with all performance fixes"""
-        print("🚀 Starting Optimized CUDA Training!")
+        """Conservative training loop with stability focus"""
+        print("🚀 Starting Conservative CUDA Training!")
 
-        # Load data with parallel processing
-        aa_sequences, struct_sequences = self.load_dataset_parallel()
+        # Load data conservatively
+        aa_sequences, struct_sequences = self.load_dataset_conservative()
 
         # Compute adaptive weights
         char_frequencies = self.compute_character_frequencies(struct_sequences)
 
-        # Split data
+        # Conservative data split
         total_pairs = len(aa_sequences)
         train_size = int(0.9 * total_pairs)
         val_size = int(0.05 * total_pairs)
@@ -405,77 +330,63 @@ class OptimizedCudaTrainer:
         val_aa = aa_sequences[train_size:train_size + val_size]
         val_struct = struct_sequences[train_size:train_size + val_size]
 
-        print(f"🔀 Data split:")
+        print(f"🔀 Conservative data split:")
         print(f"  🔵 TRAIN: {len(train_aa):,} pairs")
         print(f"  🟡 VAL: {len(val_aa):,} pairs")
 
-        # Create optimized datasets
-        train_dataset = FastProteinDataset(train_aa, train_struct, self.config)
-        val_dataset = FastProteinDataset(val_aa, val_struct, self.config)
+        # Create conservative datasets
+        train_dataset = ConservativeProteinDataset(train_aa, train_struct, self.config)
+        val_dataset = ConservativeProteinDataset(val_aa, val_struct, self.config)
 
-        # Initialize optimized model
-        model = OptimizedProteinLTCModel(self.config)
+        # Initialize conservative model
+        model = ConservativeProteinLTCModel(self.config).to(self.device)
 
-        # Multi-GPU setup if available
-        if torch.cuda.device_count() > 1:
-            print(f"🔥 Using {torch.cuda.device_count()} GPUs with DataParallel!")
-            model = nn.DataParallel(model)
-
-        model = model.to(self.device)
-
-        # Auto-optimize batch size
-        sample_batch = train_dataset[0][0].unsqueeze(0)
-        optimal_batch_size = self.auto_optimize_batch_size(model, sample_batch)
-        self.config['batch_size'] = optimal_batch_size
-
-        # Create optimized data loaders with conservative worker count
+        # Conservative data loaders - NO multiprocessing issues
         train_loader = DataLoader(
             train_dataset,
             batch_size=self.config['batch_size'],
             shuffle=True,
-            num_workers=2,  # Conservative to avoid fork issues
-            pin_memory=True,
-            persistent_workers=False  # Disable to avoid memory leaks
+            num_workers=0,  # NO multiprocessing to avoid fork issues
+            pin_memory=True
         )
         val_loader = DataLoader(
             val_dataset,
             batch_size=self.config['batch_size'],
             shuffle=False,
-            num_workers=2,  # Conservative to avoid fork issues
-            pin_memory=True,
-            persistent_workers=False
+            num_workers=0,  # NO multiprocessing
+            pin_memory=True
         )
 
         # Initialize adaptive weights
         adaptive_weights = AdaptiveWeights(self.config['struct_vocab_size'], char_frequencies).to(self.device)
 
-        # Optimizer with CUDA optimizations
+        # Conservative optimizer
         optimizer = optim.AdamW(
             list(model.parameters()) + list(adaptive_weights.parameters()),
             lr=self.config['learning_rate'],
             weight_decay=1e-5,
-            fused=True if torch.cuda.is_available() else False  # CUDA fused optimizer
+            fused=True if torch.cuda.is_available() else False
         )
 
         # Learning rate scheduler
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.config['epochs'])
 
-        # Training loop with all optimizations
-        print(f"🚀 Optimized training configuration:")
+        print(f"🛡️ Conservative training configuration:")
         print(f"  📊 Dataset: {len(train_aa):,} training pairs")
         print(f"  🔄 Epochs: {self.config['epochs']}")
-        print(f"  🎯 Batch size: {self.config['batch_size']}")
+        print(f"  🎯 Batch size: {self.config['batch_size']} (conservative)")
         print(f"  📈 Learning rate: {self.config['learning_rate']}")
         print(f"  🔧 Mixed precision: {self.config.get('use_mixed_precision', False)}")
         print(f"  📊 Gradient accumulation: {self.config.get('gradient_accumulation_steps', 1)}")
+        print(f"  👥 Workers: 0 (no multiprocessing)")
 
-        history = {'train_loss': [], 'val_loss': [], 'vocab_coverage': []}
+        history = {'train_loss': [], 'val_loss': []}
         best_val_loss = float('inf')
 
         for epoch in range(self.config['epochs']):
             print(f"\n📍 EPOCH {epoch+1}/{self.config['epochs']}")
 
-            # Training phase with optimizations
+            # Training phase
             model.train()
             adaptive_weights.train()
             train_loss = 0.0
@@ -492,7 +403,7 @@ class OptimizedCudaTrainer:
                     predictions = model(aa_batch)
                     weights = adaptive_weights()
 
-                    # Optimized loss computation
+                    # Conservative loss computation
                     loss = F.cross_entropy(
                         predictions.view(-1, self.config['struct_vocab_size']),
                         struct_batch.view(-1),
@@ -502,7 +413,7 @@ class OptimizedCudaTrainer:
                     # Scale loss for gradient accumulation
                     loss = loss / self.config.get('gradient_accumulation_steps', 1)
 
-                # Mixed precision backward pass
+                # Conservative backward pass
                 if self.scaler:
                     self.scaler.scale(loss).backward()
                 else:
@@ -520,6 +431,10 @@ class OptimizedCudaTrainer:
                         optimizer.step()
 
                     optimizer.zero_grad()
+
+                    # Conservative memory management
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
 
                 train_loss += loss.item() * self.config.get('gradient_accumulation_steps', 1)
                 num_batches += 1
@@ -553,7 +468,7 @@ class OptimizedCudaTrainer:
         return model, adaptive_weights, history
 
     def validate(self, model: nn.Module, val_loader: DataLoader, adaptive_weights: AdaptiveWeights) -> float:
-        """Optimized validation phase"""
+        """Conservative validation phase"""
         model.eval()
         adaptive_weights.eval()
         val_loss = 0.0
@@ -578,11 +493,15 @@ class OptimizedCudaTrainer:
                 val_loss += loss.item()
                 num_batches += 1
 
+                # Conservative memory management
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
         return val_loss / num_batches
 
     def save_checkpoint(self, model: nn.Module, adaptive_weights: AdaptiveWeights,
                        optimizer: optim.Optimizer, epoch: int, loss: float, name: str):
-        """Save optimized model checkpoint"""
+        """Save conservative model checkpoint"""
         checkpoint = {
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -592,30 +511,33 @@ class OptimizedCudaTrainer:
             'config': self.config
         }
 
-        checkpoint_path = os.path.join(self.checkpoint_dir, f"optimized_cuda_checkpoint_{name}.pt")
+        checkpoint_path = os.path.join(self.checkpoint_dir, f"conservative_cuda_checkpoint_{name}.pt")
         torch.save(checkpoint, checkpoint_path)
         print(f"💾 Checkpoint saved: {checkpoint_path}")
 
 if __name__ == "__main__":
-    # Add multiprocessing protection for CUDA/Windows compatibility
+    # CRITICAL: Multiprocessing protection for Windows/CUDA
     import multiprocessing as mp
-    mp.set_start_method('spawn', force=True)
+    try:
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass  # Already set
 
-    print("🚀 OPTIMIZED CUDA TRAINER - Sequential Bottleneck Fixed")
+    print("🛡️ CONSERVATIVE CUDA TRAINER - Stability First")
     print("=" * 80)
 
-    trainer = OptimizedCudaTrainer(OPTIMIZED_CONFIG)
+    trainer = ConservativeCudaTrainer(CONSERVATIVE_CONFIG)
 
     try:
         start_time = time.time()
         model, adaptive_weights, history = trainer.train()
         total_time = time.time() - start_time
 
-        print(f"\n🎉 TRAINING COMPLETE!")
+        print(f"\n🎉 CONSERVATIVE TRAINING COMPLETE!")
         print(f"⏱️ Total training time: {total_time/3600:.1f} hours")
-        print(f"✅ Sequential bottleneck eliminated!")
-        print(f"✅ CUDA optimizations applied!")
-        print(f"🚀 Ready for 52M sample scaling!")
+        print(f"✅ No multiprocessing issues!")
+        print(f"✅ Conservative memory usage!")
+        print(f"🛡️ Stable and reliable training!")
 
     except Exception as e:
         print(f"❌ Training failed: {e}")

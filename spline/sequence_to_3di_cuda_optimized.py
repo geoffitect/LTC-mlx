@@ -424,7 +424,7 @@ def train_optimized_sequence_to_3di_model_cuda():
             optimizer.zero_grad()
 
             # Mixed precision forward pass
-            with autocast(enabled=use_mixed_precision):
+            with autocast(device_type='cuda', enabled=use_mixed_precision):
                 logits = model(sequences)  # [batch, seq, vocab] - ALL PARALLEL! ⚡
 
                 # Reshape for loss computation
@@ -484,7 +484,7 @@ def predict_3di_sequence_optimized(model, amino_sequence: str, device: torch.dev
 
     # Predict with mixed precision
     with torch.no_grad():
-        with autocast(enabled=OPTIMIZED_SPLINE_CONFIG.get('use_mixed_precision', False)):
+        with autocast(device_type='cuda', enabled=OPTIMIZED_SPLINE_CONFIG.get('use_mixed_precision', False)):
             logits = model(input_tokens)  # Parallel processing! ⚡
             predictions = torch.argmax(logits, dim=-1)[0, :len(amino_sequence)]
 
